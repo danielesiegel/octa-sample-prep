@@ -5,22 +5,7 @@ A retro-styled audio sample slicer inspired by the Elektron Octatrack's 128x64 p
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-```
-╔════════════════════════════════════════╗
-║  ▓▓▓ OCTA SLICER ▓▓▓    S:16          ║
-║────────────────────────────────────────║
-║  MYSAMPLE.WAV              1:23.4      ║
-║  ┌──────────────────────────────────┐  ║
-║  │  ▄▄▆█▆▄▂▁▂▄▆█▆▄▄▆█▆▄▂▁▂▄▆█▆▄   │  ║
-║  │  ████████████████████████████   │  ║
-║  │  ▀▀▄█▄▀▂▁▂▄█▄▀▀▄█▄▀▂▁▂▄█▄▀   │  ║
-║  └──────────────────────────────────┘  ║
-║  SL:01/16  [START]           0.00S     ║
-║  |·····|·····|·····|·····|·····|····   ║
-║────────────────────────────────────────║
-║  READY                          L:LD   ║
-╚════════════════════════════════════════╝
-```
+![Octa Slicer Screenshot](assets/screenshot.png)
 
 ## Features
 
