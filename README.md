@@ -5,7 +5,9 @@
 
 ![Octa Slicer Screenshot](assets/screenshot.png)
 
-I needed a way to prep longer samples from songs or audio clips into smaller files before loading them onto the Octatrack. Got tired of resampling or manually creating new slices every time I wanted to chop something up. So I made this little tool that lets you visually slice a long sample into however many parts you want (8, 16, 32, etc), preview each slice, adjust the start/end points, and export them all as separate Octatrack-ready WAV files. Batch loading works too if you've got a bunch of files to process. Everything exports as 16-bit/44.1kHz mono so it's good to go straight onto the OT.
+I needed a way to prep longer samples from songs or audio clips into smaller files before loading them onto the Octatrack. I don't like resampling or manually creating new slices every time I want to chop a longer sample on the OT.
+
+This is a tool that lets you visually slice a long sample into however many parts you want (8, 16, 32, etc), preview each slice, adjust the start/end points, and export them all as separate Octatrack-ready WAV files. Batch loading allows for multiple samples, and everything exports as 16-bit/44.1kHz mono so it's good to go directly onto the OT. Happy slicing!
 
 ## Installation
 
