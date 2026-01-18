@@ -1,21 +1,11 @@
 # OCTA SLICER
 
-A retro-styled audio sample slicer inspired by the Elektron Octatrack's 128x64 pixel LCD display. Slice long audio samples into Octatrack-compatible WAV files with a visual waveform editor.
-
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ![Octa Slicer Screenshot](assets/screenshot.png)
 
-## Features
-
-- **128x64 Pixel LCD Simulation** - Authentic low-res display aesthetic with bitmap fonts
-- **Visual Waveform Editor** - See your audio and slice points in real-time
-- **Keyboard-Driven Workflow** - Fast editing with intuitive key controls
-- **Slice Playback** - Preview slices before exporting
-- **Octatrack-Compatible Export** - Automatic conversion to 16-bit/44.1kHz WAV
-- **Batch Processing** - Load multiple files and process them in sequence
-- **Format Validation** - Ensures exported files are valid and Octatrack-ready
+I needed a way to prep longer samples from songs or audio clips into smaller files before loading them onto the Octatrack. Got tired of resampling or manually creating new slices every time I wanted to chop something up. So I made this little tool that lets you visually slice a long sample into however many parts you want (8, 16, 32, etc), preview each slice, adjust the start/end points, and export them all as separate Octatrack-ready WAV files. Batch loading works too if you've got a bunch of files to process. Everything exports as 16-bit/44.1kHz mono so it's good to go straight onto the OT.
 
 ## Installation
 
