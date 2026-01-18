@@ -13,7 +13,7 @@ This is a tool that lets you visually slice a long sample into however many part
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/octa-sample-prep.git
+git clone https://github.com/danedisonsiegel/octa-sample-prep.git
 cd octa-sample-prep
 
 # Install dependencies
