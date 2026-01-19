@@ -181,7 +181,8 @@ FONT_3X5 = {
 
 @dataclass
 class AudioData:
-    samples: np.ndarray
+    samples: np.ndarray  # Mono samples for display
+    samples_original: np.ndarray  # Original samples (may be stereo)
     sample_rate: int
     channels: int
     duration: float
@@ -209,18 +210,24 @@ class AudioProcessor:
             else:
                 samples, sample_rate = AudioProcessor._load_wav_native(filepath)
 
+            # Store original samples
+            samples_original = samples.copy()
+
             if len(samples.shape) > 1:
                 channels = samples.shape[1]
                 samples_mono = np.mean(samples, axis=1)
             else:
                 channels = 1
                 samples_mono = samples
+                # Make original 2D for consistency if mono
+                samples_original = samples
 
             duration = len(samples_mono) / sample_rate
             filename = os.path.basename(filepath)
 
             return AudioData(
                 samples=samples_mono,
+                samples_original=samples_original,
                 sample_rate=sample_rate,
                 channels=channels,
                 duration=duration,
@@ -259,14 +266,23 @@ class AudioProcessor:
     def resample(samples: np.ndarray, orig_rate: int, target_rate: int) -> np.ndarray:
         if orig_rate == target_rate:
             return samples
+
+        num_samples = int(len(samples) * target_rate / orig_rate)
+
         if HAS_SCIPY:
-            num_samples = int(len(samples) * target_rate / orig_rate)
-            return signal.resample(samples, num_samples).astype(np.float32)
+            # scipy.signal.resample works with multi-dimensional arrays along axis 0
+            return signal.resample(samples, num_samples, axis=0).astype(np.float32)
         else:
-            duration = len(samples) / orig_rate
-            num_samples = int(duration * target_rate)
+            # Fallback interpolation - handle both mono and stereo
             indices = np.linspace(0, len(samples) - 1, num_samples)
-            return np.interp(indices, np.arange(len(samples)), samples).astype(np.float32)
+            if len(samples.shape) > 1:
+                # Stereo - interpolate each channel
+                resampled = np.zeros((num_samples, samples.shape[1]), dtype=np.float32)
+                for ch in range(samples.shape[1]):
+                    resampled[:, ch] = np.interp(indices, np.arange(len(samples)), samples[:, ch])
+                return resampled
+            else:
+                return np.interp(indices, np.arange(len(samples)), samples).astype(np.float32)
 
     @staticmethod
     def validate_and_convert(samples: np.ndarray, sample_rate: int) -> Tuple[np.ndarray, int, List[str]]:
@@ -284,10 +300,23 @@ class AudioProcessor:
         return samples, sample_rate, warnings
 
     @staticmethod
-    def export_slice(samples: np.ndarray, sample_rate: int, filepath: str) -> Tuple[bool, str]:
+    def export_slice(samples: np.ndarray, sample_rate: int, filepath: str, stereo: bool = False) -> Tuple[bool, str]:
         try:
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            samples_int = np.clip(samples * AudioProcessor.OCTA_MAX_VALUE,
+
+            # Determine number of channels
+            if stereo and len(samples.shape) > 1:
+                n_channels = samples.shape[1]
+                samples_out = samples
+            else:
+                n_channels = 1
+                # Convert to mono if needed
+                if len(samples.shape) > 1:
+                    samples_out = np.mean(samples, axis=1)
+                else:
+                    samples_out = samples
+
+            samples_int = np.clip(samples_out * AudioProcessor.OCTA_MAX_VALUE,
                                   -AudioProcessor.OCTA_MAX_VALUE,
                                   AudioProcessor.OCTA_MAX_VALUE).astype(np.int16)
 
@@ -295,21 +324,22 @@ class AudioProcessor:
                 sf.write(filepath, samples_int, sample_rate, subtype='PCM_16')
             else:
                 with wave.open(filepath, 'wb') as wav_file:
-                    wav_file.setnchannels(1)
+                    wav_file.setnchannels(n_channels)
                     wav_file.setsampwidth(2)
                     wav_file.setframerate(sample_rate)
                     wav_file.writeframes(samples_int.tobytes())
 
-            return AudioProcessor.validate_wav(filepath)
+            return AudioProcessor.validate_wav(filepath, stereo)
         except Exception as e:
             return False, str(e)
 
     @staticmethod
-    def validate_wav(filepath: str) -> Tuple[bool, str]:
+    def validate_wav(filepath: str, stereo: bool = False) -> Tuple[bool, str]:
         try:
             with wave.open(filepath, 'rb') as wav_file:
                 sample_rate = wav_file.getframerate()
                 sample_width = wav_file.getsampwidth()
+                n_channels = wav_file.getnchannels()
                 n_frames = wav_file.getnframes()
 
                 if sample_rate != 44100:
@@ -318,6 +348,8 @@ class AudioProcessor:
                     return False, f"BAD BITS {sample_width*8}"
                 if n_frames == 0:
                     return False, "EMPTY FILE"
+                if stereo and n_channels != 2:
+                    return False, "NOT STEREO"
 
                 wav_file.readframes(min(1000, n_frames))
                 return True, "OK"
@@ -502,6 +534,7 @@ class OctaSlicer(tk.Tk):
         self.move_amount: int = 100
         self.status_msg: str = "READY"
         self.mode: str = "MAIN"  # MAIN, LOAD, BATCH, PROCESS
+        self.stereo_mode: bool = False  # False = mono, True = stereo
 
         # Batch queue
         self.file_queue: List[str] = []
@@ -542,6 +575,8 @@ class OctaSlicer(tk.Tk):
         self.bind_all('<O>', lambda e: self._select_output())
         self.bind_all('<s>', lambda e: self._cycle_slices())
         self.bind_all('<S>', lambda e: self._cycle_slices())
+        self.bind_all('<m>', lambda e: self._toggle_stereo())
+        self.bind_all('<M>', lambda e: self._toggle_stereo())
         self.bind_all('<q>', lambda e: self.destroy())
         self.bind_all('<Q>', lambda e: self.destroy())
         self.bind_all('<Escape>', lambda e: self.destroy())
@@ -564,6 +599,10 @@ class OctaSlicer(tk.Tk):
         # Header bar
         self.lcd.draw_hline(0, 8, 128)
         self.lcd.draw_text(2, 1, "OCTA SLICER", small=True)
+
+        # Show stereo/mono mode
+        mode_str = "ST" if self.stereo_mode else "MO"
+        self.lcd.draw_text(75, 1, mode_str, small=True)
 
         # Show slice count on right
         self.lcd.draw_text(100, 1, f"S:{self.num_slices:02d}", small=True)
@@ -760,6 +799,13 @@ class OctaSlicer(tk.Tk):
         self.status_msg = f"PLAY ERR: {error[:12]}"
         self._render()
 
+    def _toggle_stereo(self):
+        if self.processing:
+            return
+        self.stereo_mode = not self.stereo_mode
+        self.status_msg = "STEREO MODE" if self.stereo_mode else "MONO MODE"
+        self._render()
+
     def _cycle_slices(self):
         if self.processing:
             return
@@ -866,8 +912,14 @@ class OctaSlicer(tk.Tk):
         try:
             base_name = os.path.splitext(self.audio_data.filename)[0]
 
+            # Use original samples for stereo, mono samples otherwise
+            if self.stereo_mode and self.audio_data.channels > 1:
+                source_samples = self.audio_data.samples_original
+            else:
+                source_samples = self.audio_data.samples
+
             samples, rate, warnings = AudioProcessor.validate_and_convert(
-                self.audio_data.samples,
+                source_samples,
                 self.audio_data.sample_rate
             )
 
@@ -884,7 +936,7 @@ class OctaSlicer(tk.Tk):
                 filename = f"{base_name}-{i+1}.wav"
                 filepath = os.path.join(self.output_dir, filename)
 
-                success, msg = AudioProcessor.export_slice(slice_samples, rate, filepath)
+                success, msg = AudioProcessor.export_slice(slice_samples, rate, filepath, self.stereo_mode)
                 if not success:
                     errors.append(f"S{i+1}: {msg}")
 
